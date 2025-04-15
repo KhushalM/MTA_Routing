@@ -1,0 +1,2 @@
+# Ignore server configuration containing secrets
+servers_config.json
