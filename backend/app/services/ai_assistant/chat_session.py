@@ -87,8 +87,10 @@ class ChatSession:
         Returns:
             The assistant's response
         """
+        logger.info(f"Received user message: {user_message}")
         # Add the user message to the conversation history
         self.messages.append({"role": "user", "content": user_message})
+        logger.info(f"Current conversation history: {self.messages}")
         
         # Get the initial response from the LLM
         llm_response = await self.llm_client.get_response(self.messages)
@@ -101,7 +103,6 @@ class ChatSession:
                 # It's a tool call, process it
                 tool_name = tool_call["tool"]
                 arguments = tool_call["arguments"]
-                
                 logger.info(f"Tool call detected: {tool_name}")
                 logger.info(f"Arguments: {arguments}")
                 
@@ -109,38 +110,43 @@ class ChatSession:
                 tool_result = None
                 for server in self.servers:
                     try:
+                        logger.info(f"Checking server {server.name} for tool {tool_name}")
                         tools = await server.list_tools()
                         if any(tool.name == tool_name for tool in tools):
-                            # Execute the tool
+                            logger.info(f"Executing tool {tool_name} on server {server.name} with arguments: {arguments}")
                             tool_result = await server.execute_tool(tool_name, arguments)
+                            logger.info(f"Tool {tool_name} executed successfully on server {server.name}. Result: {tool_result}")
                             break
                     except Exception as e:
                         logger.error(f"Error checking tools on server {server.name}: {e}")
-                
                 # Add the assistant's tool call to the conversation
                 self.messages.append({"role": "assistant", "content": llm_response})
-                
+                logger.info(f"Added tool call to conversation history.")
                 if tool_result is not None:
                     # Add the tool result as a system message
                     tool_result_str = f"Tool execution result: {tool_result}"
                     self.messages.append({"role": "system", "content": tool_result_str})
-                    
+                    logger.info(f"Added tool result to conversation history: {tool_result_str}")
                     # Get a final response from the LLM that interprets the tool result
                     final_response = await self.llm_client.get_response(self.messages)
+                    logger.info(f"Final LLM response after tool execution: {final_response}")
                     self.messages.append({"role": "assistant", "content": final_response})
                     return final_response
                 else:
                     error_msg = f"No server found with tool: {tool_name}"
+                    logger.error(error_msg)
                     self.messages.append({"role": "system", "content": error_msg})
                     final_response = await self.llm_client.get_response(self.messages)
                     self.messages.append({"role": "assistant", "content": final_response})
                     return final_response
             else:
                 # Not a tool call, just a regular response
+                logger.info("LLM response is not a tool call. Returning regular response.")
                 self.messages.append({"role": "assistant", "content": llm_response})
                 return llm_response
         except json.JSONDecodeError:
             # Not a JSON response, just a regular response
+            logger.info("LLM response is not valid JSON. Returning regular response.")
             self.messages.append({"role": "assistant", "content": llm_response})
             return llm_response
         except Exception as e:

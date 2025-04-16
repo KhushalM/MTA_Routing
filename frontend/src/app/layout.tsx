@@ -19,12 +19,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <div className="flex flex-col min-h-screen">
-          <Header />
-          <main className="flex-grow">
+        <div className="flex-col">
+          {/* Make the header fixed at the top, always visible */}
+          <div className="fixed top-0 left-0 w-full z-30 shadow bg-background">
+            <Header />
+          </div>
+          {/* Add padding top to main to prevent content being hidden under header */}
+          <main className="flex-grow mx-auto pt-20">
             {children}
           </main>
-          <Footer />
         </div>
       </body>
     </html>

@@ -4,9 +4,12 @@ import { useState } from "react"
 import Link from "next/link"
 import { ThemeToggle } from "./ThemeToggle"
 import { Menu, X } from "lucide-react"
+import { usePathname } from "next/navigation"
+import cn from "classnames"
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const pathname = usePathname()
 
   return (
     <header className="bg-white dark:bg-secondary-900 shadow-sm">
@@ -21,27 +24,21 @@ export function Header() {
             <nav className="hidden sm:ml-6 sm:flex sm:space-x-8">
               <Link
                 href="/"
-                className="border-transparent text-secondary-500 dark:text-secondary-300 hover:border-primary-500 hover:text-secondary-700 dark:hover:text-white inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+                className={cn(
+                  "border-transparent text-secondary-500 dark:text-secondary-300 hover:border-primary-500 hover:text-secondary-700 dark:hover:text-white inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium",
+                  pathname === "/" && "border-primary-500 text-secondary-700 dark:text-white"
+                )}
               >
                 Home
               </Link>
               <Link
                 href="/features"
-                className="border-transparent text-secondary-500 dark:text-secondary-300 hover:border-primary-500 hover:text-secondary-700 dark:hover:text-white inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+                className={cn(
+                  "border-transparent text-secondary-500 dark:text-secondary-300 hover:border-primary-500 hover:text-secondary-700 dark:hover:text-white inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium",
+                  pathname === "/features" && "border-primary-500 text-secondary-700 dark:text-white"
+                )}
               >
                 Features
-              </Link>
-              <Link
-                href="/docs"
-                className="border-transparent text-secondary-500 dark:text-secondary-300 hover:border-primary-500 hover:text-secondary-700 dark:hover:text-white inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-              >
-                Documentation
-              </Link>
-              <Link
-                href="/app"
-                className="border-transparent text-secondary-500 dark:text-secondary-300 hover:border-primary-500 hover:text-secondary-700 dark:hover:text-white inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-              >
-                App
               </Link>
             </nav>
           </div>
@@ -89,20 +86,6 @@ export function Header() {
               onClick={() => setIsMenuOpen(false)}
             >
               Features
-            </Link>
-            <Link
-              href="/docs"
-              className="border-transparent text-secondary-500 dark:text-secondary-300 hover:bg-secondary-50 dark:hover:bg-secondary-800 hover:border-primary-500 hover:text-secondary-700 dark:hover:text-white block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              Documentation
-            </Link>
-            <Link
-              href="/app"
-              className="border-transparent text-secondary-500 dark:text-secondary-300 hover:bg-secondary-50 dark:hover:bg-secondary-800 hover:border-primary-500 hover:text-secondary-700 dark:hover:text-white block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              App
             </Link>
           </div>
           <div className="pt-4 pb-3 border-t border-secondary-200 dark:border-secondary-700">
