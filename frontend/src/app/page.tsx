@@ -5,10 +5,11 @@ import { Paperclip, Mic, CornerDownLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AIInputWithLoading } from '@/components/ui/ai-input-with-loading';
 import { ResponseStream } from '@/components/ui/response-stream';
+import MCPServerList, { MCPServer } from '@/components/MCPServerList';
 
 interface Message {
   id: string;
-  content: string;
+  content: string | MCPServer[];
   sender: 'user' | 'ai';
 }
 
@@ -22,6 +23,22 @@ function ChatBubble({ children, sender }: { children: React.ReactNode; sender: '
       </div>
     </div>
   );
+}
+
+// Helper: Parse Markdown MCP list into array of MCPServer
+function parseMCPMarkdown(markdown: string): MCPServer[] | null {
+  // Find the MCP list section
+  const listMatch = markdown.match(/Here are available MCP servers[\s\S]*?repo:\n?([\s\S]*)/);
+  if (!listMatch) return null;
+  const list = listMatch[1];
+  // Each line: - [name](link): description
+  const regex = /- \[([^\]]+)\]\(([^\)]+)\): (.*)/g;
+  const mcps: MCPServer[] = [];
+  let match;
+  while ((match = regex.exec(list))) {
+    mcps.push({ name: match[1], link: match[2], description: match[3] });
+  }
+  return mcps.length > 0 ? mcps : null;
 }
 
 export default function LandingPage() {
@@ -85,39 +102,59 @@ export default function LandingPage() {
 
   return (
     <div className="flex flex-col h-screen bg-background">
-      <div
-        id="chatbox"
-        ref={chatboxRef}
-        className="flex-1 overflow-y-auto p-20"
-        style={{ scrollBehavior: 'smooth' }}
-      >
-        {messages.map((msg, idx) => (
-          // For the last assistant message, show streaming if loading
-          msg.sender === 'ai' && idx === messages.length - 1 && streamedResponse && loading ? (
-            <ChatBubble key={msg.id} sender={msg.sender}>
-              <ResponseStream textStream={streamedResponse} mode="typewriter" speed={30} />
+        <div
+          id="chatbox"
+          ref={chatboxRef}
+          className="flex-1 overflow-y-auto p-20 pb-40"
+          style={{ scrollBehavior: 'smooth' }}
+        >
+          {messages.map((msg, idx) => {
+            // Handle MCP search results: if array, use directly; if string, try to parse as markdown
+            if (msg.sender === 'ai') {
+              let mcps: MCPServer[] | null = null;
+              if (Array.isArray(msg.content)) {
+                // Type guard: ensure every item is an MCPServer object
+                if (msg.content.every(
+                  (item) => typeof item === 'object' && item !== null && 'name' in item && 'link' in item && 'description' in item
+                )) {
+                  mcps = msg.content as MCPServer[];
+                }
+              } else if (typeof msg.content === 'string') {
+                mcps = parseMCPMarkdown(msg.content);
+              }
+              if (mcps && mcps.length > 0) {
+                return <MCPServerList key={msg.id} mcps={mcps} />;
+              }
+            }
+            // For the last assistant message, show streaming if loading
+            if (msg.sender === 'ai' && idx === messages.length - 1 && streamedResponse && loading) {
+              return (
+                <ChatBubble key={msg.id} sender={msg.sender}>
+                  <ResponseStream textStream={streamedResponse} mode="typewriter" speed={30} />
+                </ChatBubble>
+              );
+            }
+            return (
+              <ChatBubble key={msg.id} sender={msg.sender}>
+                {typeof msg.content === 'string' ? msg.content : null}
+              </ChatBubble>
+            );
+          })}
+          {/* If loading but no assistant message yet, show streaming bubble */}
+          {loading && !streamedResponse && (
+            <ChatBubble sender="ai">
+              <ResponseStream textStream={"..."} mode="typewriter" speed={40} />
             </ChatBubble>
-          ) : (
-            <ChatBubble key={msg.id} sender={msg.sender}>
-              {msg.content}
-            </ChatBubble>
-          )
-        ))}
-        {/* If loading but no assistant message yet, show streaming bubble */}
-        {loading && !streamedResponse && (
-          <ChatBubble sender="ai">
-            <ResponseStream textStream={"..."} mode="typewriter" speed={40} />
-          </ChatBubble>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-      {/* Make the input bar absolutely pinned to the bottom, static, and never scrollable */}
-      <div className="w-full p-1 fixed bottom-0 left-0 z-20 shadow bg-background" style={{ maxWidth: '100vw', borderTop: 'none' }}>
-        <AIInputWithLoading
-          placeholder="Type your question..."
-          onSubmit={handleSend}
-          loadingDuration={loading ? 2000 : 1000}
-        />
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+        {/* Make the input bar absolutely pinned to the bottom, static, and never scrollable */}
+        <div className="w-full p-1 fixed bottom-0 left-0 z-20 shadow bg-background" style={{ maxWidth: '100vw', borderTop: 'none' }}>
+          <AIInputWithLoading
+            placeholder="Type your question..."
+            onSubmit={handleSend}
+            loadingDuration={loading ? 2000 : 1000}
+          />
       </div>
     </div>
   );

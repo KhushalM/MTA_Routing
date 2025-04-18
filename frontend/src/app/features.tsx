@@ -32,7 +32,10 @@ export default function FeaturesPage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background py-12">
       <h1 className="text-3xl font-bold mb-8">Features</h1>
-      <DisplayCards cards={features} />
+      <div className="flex flex-col gap-6 w-full max-w-2xl">
+        <DisplayCards cards={features} />
+      </div>
     </div>
   );
 }
+    

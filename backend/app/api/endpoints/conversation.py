@@ -19,7 +19,7 @@ class ConversationRequest(BaseModel):
     user_id: Optional[str] = "anonymous"
 
 class ConversationResponse(BaseModel):
-    response: str
+    response: Any  # Accepts list or string for backward compatibility
     user_id: str
 
 class ConversationHistoryResponse(BaseModel):

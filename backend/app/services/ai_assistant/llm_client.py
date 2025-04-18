@@ -1,25 +1,26 @@
 """
 LLM Client module for the AI Assistant.
-Manages communication with Ollama through LangChain.
+Manages communication with local transformers with MPS acceleration.
 """
 
 import logging
-from typing import Dict, List, Optional, Any
-import json
+from typing import Dict, List
+import os
+import asyncio
+import torch
 from langchain_community.llms import Ollama
-from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
-
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(filename)s - %(lineno)d - %(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
-
 class LLMClient:
-    """Manages communication with Ollama through LangChain."""
+    """Manages communication with local transformers with MPS acceleration."""
 
     def __init__(self, model: str = "gemma3:12b") -> None:
         """Initialize the LLM client.
-        
         Args:
             model: Model name to use in Ollama (default: gemma3:12b)
         """
@@ -28,10 +29,10 @@ class LLMClient:
         logger.info(f"Initialized Ollama LLM client with model: {model}")
 
     async def get_response(
-        self, 
-        messages: List[Dict[str, str]], 
+        self,
+        messages: List[Dict[str, str]],
         temperature: float = 0.7,
-        max_tokens: int = 4096
+        max_tokens: int = 512
     ) -> str:
         """Get a response from the LLM asynchronously.
 

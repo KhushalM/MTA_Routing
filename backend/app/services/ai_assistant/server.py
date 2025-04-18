@@ -14,9 +14,13 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 from app.services.ai_assistant.tool import Tool
+from app.services.ai_assistant.llm_client import LLMClient
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(filename)s - %(lineno)d - %(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 
@@ -35,6 +39,7 @@ class Server:
         self.session: Optional[ClientSession] = None
         self._cleanup_lock: asyncio.Lock = asyncio.Lock()
         self.exit_stack: AsyncExitStack = AsyncExitStack()
+        self.llm_client = LLMClient()
 
     async def initialize(self) -> None:
         """Initialize the server connection.

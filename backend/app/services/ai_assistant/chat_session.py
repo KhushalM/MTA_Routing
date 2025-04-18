@@ -6,15 +6,18 @@ Orchestrates the interaction between user, LLM, and tools.
 import asyncio
 import json
 import logging
-from typing import Any, Dict, List, Optional, Tuple
-
+from typing import Any, Dict, List, Optional
+from langchain_community.vectorstores import Chroma
 from app.services.ai_assistant.llm_client import LLMClient
 from app.services.ai_assistant.server import Server
+from app.services.ai_assistant.mcp_scraper import scrape_awesome_mcp_servers
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(filename)s - %(lineno)d - %(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
-
 
 class ChatSession:
     """Orchestrates the interaction between user, LLM, and tools."""
@@ -57,6 +60,7 @@ class ChatSession:
             "You are a helpful assistant with access to these tools:\n\n"
             f"{tools_description}\n"
             "Choose the appropriate tool based on the user's question. "
+            "Before using a tool, reason once before using it.\n\n"
             "If no tool is needed, reply directly.\n\n"
             "IMPORTANT: When you need to use a tool, you must ONLY respond with "
             "the exact JSON object format below, nothing else:\n"
@@ -73,6 +77,8 @@ class ChatSession:
             "4. Use appropriate context from the user's question\n"
             "5. Avoid simply repeating the raw data\n\n"
             "Please use only the tools that are explicitly defined above."
+
+            "If the query is about MCP servers, check if the query mentions what type of MCP server is being asked for. "
         )
         
         # Initialize the messages list with the system message
@@ -91,6 +97,60 @@ class ChatSession:
         # Add the user message to the conversation history
         self.messages.append({"role": "user", "content": user_message})
         logger.info(f"Current conversation history: {self.messages}")
+        
+        # Special: If user asks for available MCPs, fetch from awesome-mcp-servers
+        if "list mcp" in str(user_message).lower() or "available mcp" in str(user_message).lower() or "huggingface mcp" in str(user_message).lower():
+            try:
+                logger.info("Fetching MCP list from awesome-mcp-servers GitHub repo...")
+                mcps = await scrape_awesome_mcp_servers()
+                if mcps:
+                    try:
+                        from app.services.ai_assistant.chroma_utils import store_mcps_in_chroma
+                        store_mcps_in_chroma(mcps)
+                        logger.info("Stored scraped MCPs in Chroma for semantic search.")
+                    except Exception as e:
+                        logger.error(f"Failed to store MCPs in Chroma: {e}")
+                    
+                    try:
+                        from app.services.ai_assistant.chroma_utils import semantic_search_mcps
+                        logger.info("Performing semantic search for MCPs...")
+                        results = semantic_search_mcps(user_message, mcps=mcps)
+                        if results:
+                            # Return results as a JSON-serializable list of dicts for the UI
+                            reply = [
+                                {
+                                    "name": r.metadata["name"],
+                                    "link": r.metadata["link"],
+                                    "description": r.metadata["description"]
+                                } for r in results
+                            ]
+                            self.messages.append({"role": "assistant", "content": reply})
+                            return reply
+                        else:
+                            reply = []
+                            self.messages.append({"role": "assistant", "content": reply})
+                            return reply
+                    except Exception as e:
+                        logger.error(f"Failed to perform semantic search: {e}")
+                        reply = f"Error performing semantic search: {e}"
+                        self.messages.append({"role": "assistant", "content": reply})
+                        return reply
+                if not mcps:
+                    reply = "No MCP servers found in the awesome-mcp-servers repo."
+                    self.messages.append({"role": "assistant", "content": reply})
+                    return reply
+                # Format as markdown bullet points with clickable links
+                mcp_lines = [
+                    f"- [{m['name']}]({m['link']}): {m['description']}" for m in mcps
+                ]
+                reply = "Here are available MCP servers from the [awesome-mcp-servers](https://github.com/punkpeye/awesome-mcp-servers) repo:\n\n" + "\n".join(mcp_lines)
+                self.messages.append({"role": "assistant", "content": reply})
+                return reply
+            except Exception as err:
+                logger.error(f"Error fetching MCPs: {err}")
+                reply = f"Error fetching MCP list: {err}"
+                self.messages.append({"role": "assistant", "content": reply})
+                return reply
         
         # Get the initial response from the LLM
         llm_response = await self.llm_client.get_response(self.messages)

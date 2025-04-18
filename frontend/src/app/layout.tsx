@@ -21,11 +21,11 @@ export default function RootLayout({
       <body className={inter.className}>
         <div className="flex-col">
           {/* Make the header fixed at the top, always visible */}
-          <div className="fixed top-0 left-0 w-full z-30 shadow bg-background">
+          <div className="top-0 left-0 w-full z-30 shadow bg-background">
             <Header />
           </div>
           {/* Add padding top to main to prevent content being hidden under header */}
-          <main className="flex-grow mx-auto pt-20">
+          <main className="flex-grow mx-auto pt-20 overflow-y-auto">
             {children}
           </main>
         </div>

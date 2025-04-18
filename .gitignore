@@ -42,6 +42,8 @@ ENV/
 .pytest_cache/
 XQ/
 
+# FAISS index
+faiss_index/
 
 # IDE / Editors
 .idea/
