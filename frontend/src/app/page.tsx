@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { AIInputWithLoading } from '@/components/ui/ai-input-with-loading';
 import { ResponseStream } from '@/components/ui/response-stream';
 import MCPServerList, { MCPServer } from '@/components/MCPServerList';
+import { AgentTweetCard } from '@/components/AgentTweetCard';
 
 interface Message {
   id: string;
@@ -125,6 +126,10 @@ export default function LandingPage() {
               if (mcps && mcps.length > 0) {
                 return <MCPServerList key={msg.id} mcps={mcps} />;
               }
+            }
+            // Always show AgentTweetCard for any AI string response
+            if (msg.sender === 'ai' && typeof msg.content === 'string') {
+              return <AgentTweetCard key={msg.id} summary={msg.content} />;
             }
             // For the last assistant message, show streaming if loading
             if (msg.sender === 'ai' && idx === messages.length - 1 && streamedResponse && loading) {
