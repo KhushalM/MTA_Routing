@@ -70,6 +70,9 @@ class ChatSession:
             '        "argument-name": "value"\n'
             "    }\n"
             "}\n\n"
+
+            "Avoid markdown formatting in responses.\n"
+            "The response should be the exact JSON object format above and not any other unnecessary tokens.\n"
             "After receiving a tool's response:\n"
             "1. Transform the raw data into a natural, conversational response\n"
             "2. Keep responses concise but informative\n"

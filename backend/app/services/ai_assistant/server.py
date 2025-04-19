@@ -98,7 +98,7 @@ class Server:
             if isinstance(item, tuple) and item[0] == "tools":
                 for tool in item[1]:
                     tools.append(Tool(tool.name, tool.description, tool.inputSchema))
-
+                    logger.info(f"Tool found: {tool.name}")
         logger.info(f"Found {len(tools)} tools in server {self.name}")
         return tools
 
@@ -152,9 +152,9 @@ class Server:
         async with self._cleanup_lock:
             try:
                 if self.session:
-                    logger.info(f"Cleaning up server {self.name}...")
-                    await self.exit_stack.aclose()
-                    self.session = None
-                    logger.info(f"Server {self.name} cleaned up successfully")
+                    await self.session.aclose()
+                    logger.info(f"Server {self.name} session closed successfully")
+            except (asyncio.CancelledError, RuntimeError) as e:
+                logger.warning(f"Suppressed shutdown error during cleanup of server {self.name}: {e}")
             except Exception as e:
                 logger.error(f"Error during cleanup of server {self.name}: {e}")

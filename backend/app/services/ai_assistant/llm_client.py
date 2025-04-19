@@ -5,9 +5,7 @@ Manages communication with local transformers with MPS acceleration.
 
 import logging
 from typing import Dict, List
-import os
-import asyncio
-import torch
+from langchain.schema import SystemMessage, AIMessage, HumanMessage
 from langchain_community.llms import Ollama
 # Configure logging
 logging.basicConfig(
