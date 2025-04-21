@@ -7,6 +7,8 @@ import { AIInputWithLoading } from '@/components/ui/ai-input-with-loading';
 import { ResponseStream } from '@/components/ui/response-stream';
 import MCPServerList, { MCPServer } from '@/components/MCPServerList';
 import { AgentTweetCard } from '@/components/AgentTweetCard';
+import { MarkdownBlocks } from '@/components/MarkdownBlocks';
+import { parseMarkdownToBlocks } from '@/utils/markdownToBlocks';
 
 interface Message {
   id: string;
@@ -126,6 +128,11 @@ export default function LandingPage() {
               if (mcps && mcps.length > 0) {
                 return <MCPServerList key={msg.id} mcps={mcps} />;
               }
+            }
+            // Render markdown blocks for any AI string response
+            if (msg.sender === 'ai' && typeof msg.content === 'string') {
+              const blocks = parseMarkdownToBlocks(msg.content);
+              return <MarkdownBlocks key={msg.id} blocks={blocks} />;
             }
             // Always show AgentTweetCard for any AI string response
             if (msg.sender === 'ai' && typeof msg.content === 'string') {

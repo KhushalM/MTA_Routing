@@ -26,3 +26,7 @@ mcp
 mcp-client
 langgraph
 python-dotenv
+geopy
+pandas
+requests
+fastmcp

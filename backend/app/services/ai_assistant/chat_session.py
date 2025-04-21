@@ -72,7 +72,7 @@ class ChatSession:
             "}\n\n"
 
             "Avoid markdown formatting in responses.\n"
-            "The response should be the exact JSON object format above and not any other unnecessary tokens.\n"
+            "The response should be the exact JSON object format above and not any other unnecessary tokens like AI:  or ''' etc. Just pure JSON.\n"
             "After receiving a tool's response:\n"
             "1. Transform the raw data into a natural, conversational response\n"
             "2. Keep responses concise but informative\n"
@@ -80,6 +80,8 @@ class ChatSession:
             "4. Use appropriate context from the user's question\n"
             "5. Avoid simply repeating the raw data\n\n"
             "Please use only the tools that are explicitly defined above."
+
+            "Once tool response is received, transform the raw data into a natural, conversational response."
 
             "If the query is about MCP servers, check if the query mentions what type of MCP server is being asked for. "
         )
