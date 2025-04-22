@@ -64,6 +64,7 @@ class ChatSession:
             "If no tool is needed, reply directly.\n\n"
             "IMPORTANT: When you need to use a tool, you must ONLY respond with "
             "the exact JSON object format below, nothing else:\n"
+            "STRICTLY FOLLOW THE JSON FORMAT BELOW with no ``` or ```:\n"
             "{\n"
             '    "tool": "tool-name",\n'
             '    "arguments": {\n'
@@ -71,8 +72,6 @@ class ChatSession:
             "    }\n"
             "}\n\n"
 
-            "Avoid markdown formatting in responses.\n"
-            "The response should be the exact JSON object format above and not any other unnecessary tokens like AI:  or ''' etc. Just pure JSON.\n"
             "After receiving a tool's response:\n"
             "1. Transform the raw data into a natural, conversational response\n"
             "2. Keep responses concise but informative\n"
@@ -82,7 +81,6 @@ class ChatSession:
             "Please use only the tools that are explicitly defined above."
 
             "Once tool response is received, transform the raw data into a natural, conversational response."
-
             "If the query is about MCP servers, check if the query mentions what type of MCP server is being asked for. "
         )
         
@@ -160,7 +158,13 @@ class ChatSession:
         # Get the initial response from the LLM
         llm_response = await self.llm_client.get_response(self.messages)
         logger.info(f"Initial LLM response: {llm_response}")
-        
+        if llm_response.startswith("AI:"):
+            llm_response = llm_response[3:]
+        if llm_response.startswith("```json"):
+            llm_response = llm_response[7:]
+        if llm_response.endswith("```"):
+            llm_response = llm_response[:-3]
+        logger.info(f"Processed LLM response: {llm_response}")
         # Check if the response is a tool call
         try:
             tool_call = json.loads(llm_response)
@@ -188,8 +192,27 @@ class ChatSession:
                 self.messages.append({"role": "assistant", "content": llm_response})
                 logger.info(f"Added tool call to conversation history.")
                 if tool_result is not None:
-                    # Add the tool result as a system message
-                    tool_result_str = f"Tool execution result: {tool_result}"
+                    # Special handling for plan_subway_trip
+                    if tool_name == "plan_subway_trip":
+                        try:
+                            import json as _json
+                            # If result is a stringified JSON, parse and summarize
+                            if isinstance(tool_result, str):
+                                result_dict = _json.loads(tool_result)
+                            else:
+                                result_dict = tool_result
+                            summary = (
+                                f"Subway trip plan:\n"
+                                f"Origin: {result_dict.get('origin')}\n"
+                                f"Destination: {result_dict.get('dest')}\n"
+                                f"Note: {result_dict.get('note')}"
+                            )
+                            tool_result_str = summary
+                        except Exception as e:
+                            logger.error(f"Error summarizing plan_subway_trip result: {e}")
+                            tool_result_str = f"Tool execution result: {tool_result}"
+                    else:
+                        tool_result_str = f"Tool execution result: {tool_result}"
                     self.messages.append({"role": "system", "content": tool_result_str})
                     logger.info(f"Added tool result to conversation history: {tool_result_str}")
                     # Get a final response from the LLM that interprets the tool result
@@ -221,8 +244,12 @@ class ChatSession:
             self.messages.append({"role": "assistant", "content": error_msg})
             return error_msg
 
+    def reset_history(self) -> None:
+        """Clear the chat history."""
+        self.messages = []
+
     async def cleanup(self) -> None:
-        """Clean up all servers properly."""
+        """Clean up all servers properly and reset chat history."""
         cleanup_tasks = []
         for server in self.servers:
             cleanup_tasks.append(asyncio.create_task(server.cleanup()))
@@ -233,3 +260,4 @@ class ChatSession:
                 logger.info("All servers cleaned up successfully")
             except Exception as e:
                 logger.warning(f"Warning during final cleanup: {e}")
+        self.reset_history()
