@@ -19,17 +19,23 @@ This project provides an MCP (Modular Command Protocol) server for New York City
    - The server exposes endpoints/tools (e.g., `plan_subway_trip`) that compute the fastest route between two points.
    - Uses the RAPTOR algorithm under the hood for efficient and accurate results.
 
-## Installation
-1. Clone this repository.
-2. Install Python 3.11+ and [Java 21+](https://adoptium.net/).
-3. Create a virtual environment:
+## Installation (with uv)
+1. Install [uv](https://github.com/astral-sh/uv):
    ```sh
-   python3 -m venv XQ
-   source XQ/bin/activate
+   pip install uv
+   # or
+   brew install uv
+   # or
+   curl -Ls https://astral.sh/uv/install.sh | sh
    ```
-4. Install requirements:
+2. Install dependencies:
    ```sh
-   pip install -r requirements.txt
+   uv pip sync requirements.lock
+   ```
+3. To update dependencies, edit `requirements.txt` and run:
+   ```sh
+   uv pip compile requirements.txt -o requirements.lock
+   uv pip sync requirements.lock
    ```
 
 ## Usage
@@ -51,7 +57,8 @@ To use as part of a tool-using AI assistant, ensure the MCP server is launched a
 
 ## Project Structure
 - `MCP servers/mta_fast_mcp.py` — Main MCP server code for subway routing
-- `requirements.txt` — Python dependencies
+- `requirements.txt` — Human-editable Python dependencies
+- `requirements.lock` — Fully resolved, deterministic dependency lockfile for uv
 
 ## License
 GPL-3.0-or-later or MIT (per r5py)

@@ -14,23 +14,18 @@ from geopy.distance import great_circle
 from dotenv import load_dotenv
 import os
 load_dotenv()
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-import sys
-
-if not logger.hasHandlers():
-    handler = logging.StreamHandler(sys.stdout)
-    formatter = logging.Formatter('%(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-
-
 
 import r5py
 from fastmcp import FastMCP
+import logging
+import sys
 
-
-
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger(__name__)
 mcp = FastMCP("mta-subway-tools")
 
 GTFS_ZIP = "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip"
@@ -44,31 +39,43 @@ def stops() -> pd.DataFrame:
     if _stops is None:
         resp = requests.get(GTFS_ZIP)
         z = zipfile.ZipFile(io.BytesIO(resp.content))
+        logger.info("Reading stops.txt from GTFS zip (in-memory)")
         _stops = pd.read_csv(z.open("stops.txt"))
     return _stops
 
 def get_transport_network():
     global _transport_network
     if _transport_network is None:
+        logger.info("Creating r5py.TransportNetwork")
         cache_dir = os.path.expanduser("~/.cache/r5py")
+        logger.info(f"Using cache directory: {cache_dir}")
         os.makedirs(cache_dir, exist_ok=True)
         gtfs_path = os.path.join(cache_dir, "gtfs.zip")
         osm_path = os.path.join(cache_dir, "nyc.osm.pbf")
+        logger.info(f"Checking for GTFS at {gtfs_path} and OSM at {osm_path}")
         if not os.path.exists(gtfs_path):
+            logger.info(f"Downloading GTFS zip to {gtfs_path}")
             with open(gtfs_path, "wb") as f:
                 f.write(requests.get(GTFS_ZIP).content)
         if not os.path.exists(osm_path):
+            logger.info(f"Downloading OSM PBF to {osm_path}")
             with open(osm_path, "wb") as f:
                 f.write(requests.get(OSM_PBF_URL).content)
+        logger.info(f"Creating r5py.TransportNetwork with OSM: {osm_path}, GTFS: {gtfs_path}")
+        logger.info(f"OSM path exists: {os.path.exists(osm_path)}, GTFS path exists: {os.path.exists(gtfs_path)}")
+        logger.info(f"OSM path type: {type(osm_path)}, GTFS path type: {type(gtfs_path)}")
+        
         _transport_network = r5py.TransportNetwork(osm_path, gtfs_path)
     return _transport_network
 
 @mcp.tool()
 def get_nearest_subway_station(lat: float, lon: float) -> Dict:
     """Return the closest station to a point (meters)."""
-    s = stops()
-    s["dist"] = s.apply(lambda r: great_circle((lat, lon), (r.stop_lat, r.stop_lon)).meters, axis=1)
-    n = s.nsmallest(1, "dist").iloc[0]
+    logger.info(f"Finding nearest station to ({lat}, {lon})")
+    stops_df = stops()
+    logger.info(f"Found {len(stops_df)} stations")
+    stops_df["dist"] = stops_df.apply(lambda r: great_circle((lat, lon), (r.stop_lat, r.stop_lon)).meters, axis=1)
+    n = stops_df.nsmallest(1, "dist").iloc[0]
     return {"station_id": n.stop_id, "stop_name": n.stop_name, "distance_m": round(n.dist, 1)}
 
 @mcp.tool()
@@ -76,8 +83,6 @@ def plan_subway_trip(o_lat: float, o_lon: float, d_lat: float, d_lon: float) -> 
     """Find optimal transit route between two points using r5py."""
     origin = get_nearest_subway_station(o_lat, o_lon)
     dest = get_nearest_subway_station(d_lat, d_lon)
-    logger.info(f"[DEBUG] Origin input: ({o_lat}, {o_lon}) Nearest stop: {origin}")
-    logger.info(f"[DEBUG] Destination input: ({d_lat}, {d_lon}) Nearest stop: {dest}")
 
     try:
         transport_network = get_transport_network()
@@ -154,6 +159,24 @@ def test_subway_router():
             print(f" • Departure time: {result['departure_time']}")
             print(f" • Arrival time: {result['arrival_time']}")
 
+def test_get_nearest_subway_station():
+    test_cases = [
+        (40.7128, -74.0060, "Downtown"),
+        (40.6782, -73.9442, "Brooklyn"),
+        (40.7505, -73.8854, "Queens"),
+        (40.7527, -73.9772, "Manhattan")
+    ]
+    for i, (lat, lon, desc) in enumerate(test_cases):
+        print(f"\nTest case {i+1}: {desc}")
+        result = get_nearest_subway_station(lat, lon)
+        if 'error' in result:
+            logger.error(f"Error: {result['error']}")
+        elif 'message' in result:
+            print(f"Message: {result['message']}")
+        else:
+            print(f"Closest station: {result['stop_name']} ({result['distance_m']}m)")
+
 if __name__ == "__main__":
     test_subway_router()
+    test_get_nearest_subway_station()
     mcp.run()

@@ -196,16 +196,49 @@ class ChatSession:
                     if tool_name == "plan_subway_trip":
                         try:
                             import json as _json
-                            # If result is a stringified JSON, parse and summarize
-                            if isinstance(tool_result, str):
-                                result_dict = _json.loads(tool_result)
+                            import ast
+                            # Extract text from tool_result if needed
+                            if hasattr(tool_result, "content") and isinstance(tool_result.content, list) and len(tool_result.content) > 0:
+                                text_content = getattr(tool_result.content[0], "text", None)
+                                if text_content is not None:
+                                    # The text is a string representation of a dict, not JSON
+                                    try:
+                                        result_dict = ast.literal_eval(text_content)
+                                    except Exception:
+                                        result_dict = text_content  # fallback
+                                else:
+                                    result_dict = tool_result
+                            elif isinstance(tool_result, str):
+                                try:
+                                    result_dict = _json.loads(tool_result)
+                                except Exception:
+                                    try:
+                                        result_dict = ast.literal_eval(tool_result)
+                                    except Exception:
+                                        result_dict = tool_result
                             else:
                                 result_dict = tool_result
+
+                            # Patch: handle both dict and object
+                            if isinstance(result_dict, dict):
+                                origin = result_dict.get('origin')
+                                destination = result_dict.get('destination')
+                                travel_time = result_dict.get('travel_time_minutes')
+                                departure_time = result_dict.get('departure_time')
+                                arrival_time = result_dict.get('arrival_time')
+                            else:
+                                origin = getattr(result_dict, 'origin', None)
+                                destination = getattr(result_dict, 'dest', None)
+                                travel_time = getattr(result_dict, 'travel_time_minutes', None)
+                                departure_time = getattr(result_dict, 'departure_time', None)
+                                arrival_time = getattr(result_dict, 'arrival_time', None)
                             summary = (
                                 f"Subway trip plan:\n"
-                                f"Origin: {result_dict.get('origin')}\n"
-                                f"Destination: {result_dict.get('dest')}\n"
-                                f"Note: {result_dict.get('note')}"
+                                f"Origin: {origin}\n"
+                                f"Destination: {destination}\n"
+                                f"Travel time: {travel_time} minutes\n"
+                                f"Departure time: {departure_time}\n"
+                                f"Arrival time: {arrival_time}"
                             )
                             tool_result_str = summary
                         except Exception as e:

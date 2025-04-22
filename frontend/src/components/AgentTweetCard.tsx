@@ -8,6 +8,7 @@ export interface AgentTweetCardProps {
   name?: string;
   username?: string;
   socialUrl?: string;
+  toolCall?: string;
 }
 
 export function AgentTweetCard({
@@ -15,7 +16,8 @@ export function AgentTweetCard({
   avatarUrl = "/images.jpeg", // Place this image in your public/ directory or use a URL
   name = "Agent",
   username = "@agent",
-  socialUrl = "https://21st.dev/"
+  socialUrl = "https://21st.dev/",
+  toolCall
 }: AgentTweetCardProps) {
   return (
     <Card className="w-[1000px] h-auto p-5 relative bg-card border-border">
@@ -41,6 +43,11 @@ export function AgentTweetCard({
       >
         <Icons.twitter className="h-4 w-4" aria-hidden="true" />
       </button>
+      {toolCall && (
+        <div className="mt-5">
+          <p className="text-muted-foreground font-medium">{toolCall}</p>
+        </div>
+      )}
     </Card>
   );
 }
