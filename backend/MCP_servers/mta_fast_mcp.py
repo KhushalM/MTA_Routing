@@ -226,6 +226,18 @@ def test_get_nearest_subway_station():
             print(f"Geopoint: {o_name}:({o_lat}, {o_lon})")
 
 if __name__ == "__main__":
-    test_subway_router()
-    test_get_nearest_subway_station()
-    mcp.run()
+    try:
+        print("Starting server...", flush=True)
+        mcp.run()
+    except KeyboardInterrupt:
+        # Do not log or print here; just exit silently
+        sys.exit(0)
+    except Exception as e:
+        # Optionally log only if sys.stderr is open
+        try:
+            import sys
+            if sys.stderr:
+                print(f"Unhandled exception: {e}", file=sys.stderr)
+        except Exception:
+            pass
+        sys.exit(1)

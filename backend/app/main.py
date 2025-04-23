@@ -6,6 +6,7 @@ import os
 import logging
 from dotenv import load_dotenv
 from app.services.ai_assistant import get_assistant, AIAssistant
+import asyncio
 
 # Load environment variables
 load_dotenv()
@@ -77,6 +78,9 @@ async def shutdown_event():
         assistant = await get_assistant()
         await assistant.cleanup()
         logger.info("AI Assistant cleaned up successfully on shutdown")
+    except (asyncio.CancelledError, RuntimeError):
+        # Suppress cancellation errors during shutdown
+        pass
     except Exception as e:
         logger.error(f"Error cleaning up AI Assistant on shutdown: {e}")
 

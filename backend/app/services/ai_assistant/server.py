@@ -151,10 +151,13 @@ class Server:
         """Clean up server resources."""
         async with self._cleanup_lock:
             try:
-                if self.session:
-                    await self.session.aclose()
-                    logger.info(f"Server {self.name} session closed successfully")
-            except (asyncio.CancelledError, RuntimeError) as e:
-                logger.warning(f"Suppressed shutdown error during cleanup of server {self.name}: {e}")
+                await self.exit_stack.aclose()
+                self.session = None
+                if hasattr(self, 'stdio_context'):
+                    self.stdio_context = None
+                logger.info(f"Server {self.name} cleaned up successfully")
+            except (asyncio.CancelledError, RuntimeError):
+                # Suppress cancellation errors during shutdown
+                pass
             except Exception as e:
                 logger.error(f"Error during cleanup of server {self.name}: {e}")
