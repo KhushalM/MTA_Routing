@@ -9,6 +9,7 @@ import MCPServerList, { MCPServer } from '@/components/MCPServerList';
 import { AgentTweetCard } from '@/components/AgentTweetCard';
 import { MarkdownBlocks } from '@/components/MarkdownBlocks';
 import { parseMarkdownToBlocks } from '@/utils/markdownToBlocks';
+import RouteMap from '@/components/RouteMap';
 
 interface Message {
   id: string;
@@ -42,6 +43,33 @@ function parseMCPMarkdown(markdown: string): MCPServer[] | null {
     mcps.push({ name: match[1], link: match[2], description: match[3] });
   }
   return mcps.length > 0 ? mcps : null;
+}
+
+// Helper to extract route coordinates from mta_fast_mcp response
+function extractRouteCoords(text: string): { origin: [number, number], destination: [number, number] } | null {
+  const match = text.match(/Origin: \(([-\d.]+), ([-\d.]+)\), Destination: \(([-\d.]+), ([-\d.]+)\)/);
+  if (!match) return null;
+  return {
+    origin: [parseFloat(match[1]), parseFloat(match[2])],
+    destination: [parseFloat(match[3]), parseFloat(match[4])]
+  };
+}
+
+// Type guard for plan_subway_trip tool response
+function isPlanSubwayTripToolData(msg: any): msg is { response: string; tool_data: { origin_lat: number; origin_lon: number; destination_lat: number; destination_lon: number; [key: string]: any } } {
+  return (
+    typeof msg === 'object' &&
+    msg !== null &&
+    'tool_data' in msg &&
+    'response' in msg &&
+    typeof msg.response === 'string' &&
+    typeof msg.tool_data === 'object' &&
+    msg.tool_data !== null &&
+    'origin_lat' in msg.tool_data &&
+    'origin_lon' in msg.tool_data &&
+    'destination_lat' in msg.tool_data &&
+    'destination_lon' in msg.tool_data
+  );
 }
 
 export default function LandingPage() {
@@ -129,18 +157,45 @@ export default function LandingPage() {
                 return <MCPServerList key={msg.id} mcps={mcps} />;
               }
             }
-            // Render markdown blocks for any AI string response
+            // Render markdown blocks and map if plan_subway_trip tool_data exists
+            if (
+              msg.sender === 'ai' &&
+              isPlanSubwayTripToolData(msg.content)
+            ) {
+              const td = msg.content.tool_data;
+              return (
+                <ChatBubble key={msg.id} sender={msg.sender}>
+                  <MarkdownBlocks blocks={parseMarkdownToBlocks(msg.content.response)} />
+                  {td.origin_lat && td.origin_lon && td.destination_lat && td.destination_lon && (
+                    <div className="my-4">
+                      <RouteMap origin={[td.origin_lat, td.origin_lon]} destination={[td.destination_lat, td.destination_lon]} />
+                    </div>
+                  )}
+                </ChatBubble>
+              );
+            }
+            // Render markdown blocks for any AI string response, and show map if route coordinates exist
             if (msg.sender === 'ai' && typeof msg.content === 'string') {
               const blocks = parseMarkdownToBlocks(msg.content);
+              const coords = extractRouteCoords(msg.content);
               return (
-                <div className="bg-gray-100 rounded-xl p-4 shadow-sm w-fit max-w-xl my-4">
-                  <MarkdownBlocks key={msg.id} blocks={blocks} />
-                </div>
+                <ChatBubble key={msg.id} sender={msg.sender}>
+                  <MarkdownBlocks blocks={blocks} />
+                  {coords && (
+                    <div className="my-4">
+                      <RouteMap origin={coords.origin} destination={coords.destination} />
+                    </div>
+                  )}
+                </ChatBubble>
               );
             }
             // Always show AgentTweetCard for any AI string response
             if (msg.sender === 'ai' && typeof msg.content === 'string') {
-              return <AgentTweetCard key={msg.id} summary={msg.content} />;
+              return (
+                <ChatBubble key={msg.id} sender={msg.sender}>
+                  <AgentTweetCard summary={msg.content} />
+                </ChatBubble>
+              );
             }
             // For the last assistant message, show streaming if loading
             if (msg.sender === 'ai' && idx === messages.length - 1 && streamedResponse && loading) {

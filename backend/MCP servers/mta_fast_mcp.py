@@ -157,7 +157,11 @@ def plan_subway_trip(origin: str, destination: str) -> Dict:
 
             return {
                 "origin": origin["stop_name"],
+                "origin_lat": origin_lat,
+                "origin_lon": origin_lon,
                 "destination": destination["stop_name"],
+                "destination_lat": destination_lat,
+                "destination_lon": destination_lon,
                 "travel_time_minutes": round(travel_time_minutes, 1),
                 "departure_time": departure.strftime("%H:%M"),
                 "arrival_time": arrival_time.strftime("%H:%M"),
@@ -165,7 +169,11 @@ def plan_subway_trip(origin: str, destination: str) -> Dict:
         else:
             return {
                 "origin": origin["stop_name"],
+                "origin_lat": origin_lat,
+                "origin_lon": origin_lon,
                 "destination": destination["stop_name"],
+                "destination_lat": destination_lat,
+                "destination_lon": destination_lon,
                 "message": "No route found between these locations."
             }
 

@@ -81,7 +81,7 @@ class ChatSession:
             "Please use only the tools that are explicitly defined above."
 
             "Once tool response is received, transform the raw data into a natural, conversational response. The response should be around 50-100 words.\n\n"
-            "If the tool call was related to MTA and the response is about subway stations and the tool response is correct, use origin, destination, travel time, departure time, and arrival time. Then elongate the response to be around 50-100 words.\n\n"
+            "If the tool call was related to MTA and the response is about subway stations and the tool response is correct, use origin, destination, travel time, departure time, and arrival time (Ignore geolocation coordinates). Then elongate the response to be around 50-100 words.\n\n"
             "If the query is about MCP servers, check if the query mentions what type of MCP server is being asked for. "
         )
         
@@ -157,44 +157,40 @@ class ChatSession:
                 return reply
         
         # Get the initial response from the LLM
-        llm_response = await self.llm_client.get_response(self.messages)
-        logger.info(f"Initial LLM response: {llm_response}")
-        if llm_response.startswith("AI:"):
-            llm_response = llm_response[3:]
-        if llm_response.startswith("```json"):
-            llm_response = llm_response[7:]
-        if llm_response.endswith("```"):
-            llm_response = llm_response[:-3]
-        logger.info(f"Processed LLM response: {llm_response}")
-        # Check if the response is a tool call
         try:
-            tool_call = json.loads(llm_response)
-            if "tool" in tool_call and "arguments" in tool_call:
-                # It's a tool call, process it
-                tool_name = tool_call["tool"]
-                arguments = tool_call["arguments"]
-                logger.info(f"Tool call detected: {tool_name}")
-                logger.info(f"Arguments: {arguments}")
-                
-                # Find the server that has this tool
-                tool_result = None
-                for server in self.servers:
-                    try:
-                        logger.info(f"Checking server {server.name} for tool {tool_name}")
-                        tools = await server.list_tools()
-                        if any(tool.name == tool_name for tool in tools):
-                            logger.info(f"Executing tool {tool_name} on server {server.name} with arguments: {arguments}")
-                            tool_result = await server.execute_tool(tool_name, arguments)
-                            logger.info(f"Tool {tool_name} executed successfully on server {server.name}. Result: {tool_result}")
-                            break
-                    except Exception as e:
-                        logger.error(f"Error checking tools on server {server.name}: {e}")
-                # Add the assistant's tool call to the conversation
-                self.messages.append({"role": "assistant", "content": llm_response})
-                logger.info(f"Added tool call to conversation history.")
-                if tool_result is not None:
-                    # Special handling for plan_subway_trip
-                    if tool_name == "plan_subway_trip":
+            llm_response = await self.llm_client.get_response(self.messages)
+            logger.info(f"Initial LLM response: {llm_response}")
+            if llm_response.startswith("AI:"):
+                llm_response = llm_response[3:]
+            if llm_response.startswith("```json"):
+                llm_response = llm_response[7:]
+            if llm_response.endswith("```"):
+                llm_response = llm_response[:-3]
+            logger.info(f"Processed LLM response: {llm_response}")
+            # Check if the response is a tool call
+            try:
+                tool_call = json.loads(llm_response)
+                if "tool" in tool_call and "arguments" in tool_call:
+                    # It's a tool call, process it
+                    tool_name = tool_call["tool"]
+                    arguments = tool_call["arguments"]
+                    logger.info(f"Tool call detected: {tool_name}")
+                    logger.info(f"Arguments: {arguments}")
+                    
+                    # Find the server that has this tool
+                    tool_result = None
+                    for server in self.servers:
+                        try:
+                            logger.info(f"Checking server {server.name} for tool {tool_name}")
+                            tools = await server.list_tools()
+                            if any(tool.name == tool_name for tool in tools):
+                                logger.info(f"Executing tool {tool_name} on server {server.name} with arguments: {arguments}")
+                                tool_result = await server.execute_tool(tool_name, arguments)
+                                logger.info(f"Tool {tool_name} executed successfully on server {server.name}. Result: {tool_result}")
+                                break
+                        except Exception as e:
+                            logger.error(f"Error checking tools on server {server.name}: {e}")
+                    if tool_result is not None:
                         try:
                             import json as _json
                             import ast
@@ -227,12 +223,22 @@ class ChatSession:
                                 travel_time = result_dict.get('travel_time_minutes')
                                 departure_time = result_dict.get('departure_time')
                                 arrival_time = result_dict.get('arrival_time')
+                                origin_lat = result_dict.get('origin_lat')
+                                origin_lon = result_dict.get('origin_lon')
+                                destination_lat = result_dict.get('destination_lat')
+                                destination_lon = result_dict.get('destination_lon')
                             else:
                                 origin = getattr(result_dict, 'origin', None)
                                 destination = getattr(result_dict, 'dest', None)
                                 travel_time = getattr(result_dict, 'travel_time_minutes', None)
                                 departure_time = getattr(result_dict, 'departure_time', None)
                                 arrival_time = getattr(result_dict, 'arrival_time', None)
+                                origin_lat = getattr(result_dict, 'origin_lat', None)
+                                origin_lon = getattr(result_dict, 'origin_lon', None)
+                                destination_lat = getattr(result_dict, 'destination_lat', None)
+                                destination_lon = getattr(result_dict, 'destination_lon', None)
+
+                            # Compose a summary for the LLM
                             summary = (
                                 f"Subway trip plan:\n"
                                 f"Origin: {origin}\n"
@@ -241,19 +247,42 @@ class ChatSession:
                                 f"Departure time: {departure_time}\n"
                                 f"Arrival time: {arrival_time}"
                             )
-                            tool_result_str = summary
+                            # --- NEW: Attach tool_data for frontend ---
+                            tool_result_str = {
+                                "response": summary,
+                                "tool_data": {
+                                    "origin": origin,
+                                    "origin_lat": origin_lat,
+                                    "origin_lon": origin_lon,
+                                    "destination": destination,
+                                    "destination_lat": destination_lat,
+                                    "destination_lon": destination_lon,
+                                    "travel_time_minutes": travel_time,
+                                    "departure_time": departure_time,
+                                    "arrival_time": arrival_time,
+                                }
+                            }
                         except Exception as e:
                             logger.error(f"Error summarizing plan_subway_trip result: {e}")
                             tool_result_str = f"Tool execution result: {tool_result}"
                     else:
                         tool_result_str = f"Tool execution result: {tool_result}"
-                    self.messages.append({"role": "system", "content": tool_result_str})
-                    logger.info(f"Added tool result to conversation history: {tool_result_str}")
-                    # Get a final response from the LLM that interprets the tool result
-                    final_response = await self.llm_client.get_response(self.messages)
-                    logger.info(f"Final LLM response after tool execution: {final_response}")
-                    self.messages.append({"role": "assistant", "content": final_response})
-                    return final_response
+                    if tool_name == "plan_subway_trip" and isinstance(tool_result_str, dict):
+                        # Get a final response from the LLM that interprets the tool result
+                        final_response = await self.llm_client.get_response(self.messages + [{"role": "system", "content": tool_result_str["response"]}])
+                        logger.info(f"Final LLM response after tool execution: {final_response}")
+                        return {
+                            "response": final_response,
+                            "tool_data": tool_result_str["tool_data"]
+                        }
+                    else:
+                        self.messages.append({"role": "system", "content": tool_result_str})
+                        logger.info(f"Added tool result to conversation history: {tool_result_str}")
+                        # Get a final response from the LLM that interprets the tool result
+                        final_response = await self.llm_client.get_response(self.messages)
+                        logger.info(f"Final LLM response after tool execution: {final_response}")
+                        self.messages.append({"role": "assistant", "content": final_response})
+                        return final_response
                 else:
                     error_msg = f"No server found with tool: {tool_name}"
                     logger.error(error_msg)
@@ -261,16 +290,12 @@ class ChatSession:
                     final_response = await self.llm_client.get_response(self.messages)
                     self.messages.append({"role": "assistant", "content": final_response})
                     return final_response
-            else:
-                # Not a tool call, just a regular response
-                logger.info("LLM response is not a tool call. Returning regular response.")
+            except json.JSONDecodeError:
+                # Not a JSON response, just a regular response
+                logger.info("LLM response is not valid JSON. Returning regular response.")
                 self.messages.append({"role": "assistant", "content": llm_response})
                 return llm_response
-        except json.JSONDecodeError:
-            # Not a JSON response, just a regular response
-            logger.info("LLM response is not valid JSON. Returning regular response.")
-            self.messages.append({"role": "assistant", "content": llm_response})
-            return llm_response
+
         except Exception as e:
             # Some other error occurred
             error_msg = f"Error processing message: {str(e)}"
