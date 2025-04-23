@@ -132,7 +132,11 @@ export default function LandingPage() {
             // Render markdown blocks for any AI string response
             if (msg.sender === 'ai' && typeof msg.content === 'string') {
               const blocks = parseMarkdownToBlocks(msg.content);
-              return <MarkdownBlocks key={msg.id} blocks={blocks} />;
+              return (
+                <div className="bg-gray-100 rounded-xl p-4 shadow-sm w-fit max-w-xl my-4">
+                  <MarkdownBlocks key={msg.id} blocks={blocks} />
+                </div>
+              );
             }
             // Always show AgentTweetCard for any AI string response
             if (msg.sender === 'ai' && typeof msg.content === 'string') {
