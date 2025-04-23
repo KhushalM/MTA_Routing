@@ -19,6 +19,15 @@ import r5py
 from fastmcp import FastMCP
 import logging
 import sys
+from elasticsearch import Elasticsearch, helpers
+
+es = Elasticsearch(
+    "http://localhost:9200",
+    headers={
+        "Accept": "application/vnd.elasticsearch+json;compatible-with=8",
+        "Content-Type": "application/vnd.elasticsearch+json;compatible-with=8"
+    }
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,6 +51,27 @@ def stops() -> pd.DataFrame:
         logger.info("Reading stops.txt from GTFS zip (in-memory)")
         _stops = pd.read_csv(z.open("stops.txt"))
     return _stops
+
+def get_nearest_poi(name: str):
+    """
+    Returns the (lat, lon) tuple of the nearest POI using Elasticsearch.
+    """
+    res = es.search(
+        index="points_of_interest",
+        body={
+            "query": {
+                "match": {
+                    "name": name
+                }
+            }
+        }
+    )
+    hits = res["hits"]["hits"]
+    if hits:
+        loc = hits[0]["_source"]["location"]
+        return loc["lat"], loc["lon"]
+    else:
+        return None
 
 def get_transport_network():
     global _transport_network
@@ -79,10 +109,18 @@ def get_nearest_subway_station(lat: float, lon: float) -> Dict:
     return {"station_id": n.stop_id, "stop_name": n.stop_name, "distance_m": round(n.dist, 1)}
 
 @mcp.tool()
-def plan_subway_trip(o_lat: float, o_lon: float, d_lat: float, d_lon: float) -> Dict:
+def plan_subway_trip(origin: str, destination: str) -> Dict:
     """Find optimal transit route between two points using r5py."""
-    origin = get_nearest_subway_station(o_lat, o_lon)
-    dest = get_nearest_subway_station(d_lat, d_lon)
+    origin_coords = get_nearest_poi(origin)
+    destination_coords = get_nearest_poi(destination)
+    if origin_coords is None or destination_coords is None:
+        return {"error": "Origin or destination POI not found."}
+    origin_lat, origin_lon = origin_coords
+    destination_lat, destination_lon = destination_coords
+    logger.info(f"Origin: ({origin_lat}, {origin_lon}), Destination: ({destination_lat}, {destination_lon})")
+
+    origin = get_nearest_subway_station(origin_lat, origin_lon)
+    destination = get_nearest_subway_station(destination_lat, destination_lon)
 
     try:
         transport_network = get_transport_network()
@@ -90,12 +128,12 @@ def plan_subway_trip(o_lat: float, o_lon: float, d_lat: float, d_lon: float) -> 
         # Build GeoDataFrames
         origins = gpd.GeoDataFrame({
             "id": ["origin"],
-            "geometry": [Point(o_lon, o_lat)]
+            "geometry": [Point(origin_lon, origin_lat)]
         }, geometry="geometry", crs="EPSG:4326")
 
         destinations = gpd.GeoDataFrame({
             "id": ["destination"],
-            "geometry": [Point(d_lon, d_lat)]
+            "geometry": [Point(destination_lon, destination_lat)]
         }, geometry="geometry", crs="EPSG:4326")
 
         # Timezone-aware departure at 8:00 AM NYC
@@ -119,7 +157,7 @@ def plan_subway_trip(o_lat: float, o_lon: float, d_lat: float, d_lon: float) -> 
 
             return {
                 "origin": origin["stop_name"],
-                "destination": dest["stop_name"],
+                "destination": destination["stop_name"],
                 "travel_time_minutes": round(travel_time_minutes, 1),
                 "departure_time": departure.strftime("%H:%M"),
                 "arrival_time": arrival_time.strftime("%H:%M"),
@@ -127,28 +165,28 @@ def plan_subway_trip(o_lat: float, o_lon: float, d_lat: float, d_lon: float) -> 
         else:
             return {
                 "origin": origin["stop_name"],
-                "destination": dest["stop_name"],
+                "destination": destination["stop_name"],
                 "message": "No route found between these locations."
             }
 
     except Exception as e:
         return {
             "origin": origin["stop_name"],
-            "destination": dest["stop_name"],
+            "destination": destination["stop_name"],
             "error": str(e),
             "message": "Error using r5py for routing."
         }
 
 def test_subway_router():
     test_cases = [
-        (40.7128, -74.0060, 40.7580, -73.9855, "Downtown to Midtown"),
-        (40.6782, -73.9442, 40.7831, -73.9712, "Brooklyn to Upper East Side"),
-        (40.7505, -73.8854, 40.7831, -73.9712, "Queens to Upper East Side"),
-        (40.7527, -73.9772, 40.7589, -73.9851, "Short Manhattan trip")
+        ("33rd street", "Battery Park"),
+        ("33rd street", "Battery Park"),
+        ("33rd street", "Battery Park"),
+        ("33rd street", "Battery Park"),
     ]
-    for i, (o_lat, o_lon, d_lat, d_lon, desc) in enumerate(test_cases):
-        print(f"\nTest case {i+1}: {desc}")
-        result = plan_subway_trip(o_lat, o_lon, d_lat, d_lon)
+    for i, (o_name, d_name) in enumerate(test_cases):
+        print(f"\nTest case {i+1}: {o_name} to {d_name}")
+        result = plan_subway_trip(o_name, d_name)
         if 'error' in result:
             logger.error(f"Error: {result['error']}")
         elif 'message' in result:
@@ -161,20 +199,23 @@ def test_subway_router():
 
 def test_get_nearest_subway_station():
     test_cases = [
-        (40.7128, -74.0060, "Downtown"),
-        (40.6782, -73.9442, "Brooklyn"),
-        (40.7505, -73.8854, "Queens"),
-        (40.7527, -73.9772, "Manhattan")
+        ("Grand Central"),
+        ("Vessel"),
+        ("Harlem"),
+        ("MoMA"),
+        ("Flatiron"),
+        ("Holland Tunnel Vent Shaft"),
     ]
-    for i, (lat, lon, desc) in enumerate(test_cases):
-        print(f"\nTest case {i+1}: {desc}")
-        result = get_nearest_subway_station(lat, lon)
+    for i, (o_name) in enumerate(test_cases):
+        print(f"\nTest case {i+1}: {o_name}")
+        result = get_nearest_poi(o_name)
+        o_lat, o_lon = result
         if 'error' in result:
             logger.error(f"Error: {result['error']}")
         elif 'message' in result:
             print(f"Message: {result['message']}")
         else:
-            print(f"Closest station: {result['stop_name']} ({result['distance_m']}m)")
+            print(f"Geopoint: {o_name}:({o_lat}, {o_lon})")
 
 if __name__ == "__main__":
     test_subway_router()

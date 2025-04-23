@@ -17,7 +17,6 @@ export function AgentTweetCard({
   name = "Agent",
   username = "@agent",
   socialUrl = "https://21st.dev/",
-  toolCall
 }: AgentTweetCardProps) {
   return (
     <Card className="w-[1000px] h-auto p-5 relative bg-card border-border">
@@ -34,8 +33,10 @@ export function AgentTweetCard({
           <span className="text-sm text-muted-foreground">{username}</span>
         </div>
       </div>
-      <div className="mt-5 mb-5">
-        <p className="text-foreground font-medium">{summary}</p>
+      <div className="mt-5 mb-5 flex">
+        <div className="bg-gray-100 rounded-xl p-4 shadow-sm w-fit max-w-xl text-foreground font-medium">
+          {summary}
+        </div>
       </div>
       <button
         onClick={() => window.open(socialUrl, "_blank")?.focus()}
@@ -43,11 +44,6 @@ export function AgentTweetCard({
       >
         <Icons.twitter className="h-4 w-4" aria-hidden="true" />
       </button>
-      {toolCall && (
-        <div className="mt-5">
-          <p className="text-muted-foreground font-medium">{toolCall}</p>
-        </div>
-      )}
     </Card>
   );
 }

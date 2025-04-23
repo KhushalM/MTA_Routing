@@ -57,7 +57,7 @@ class ChatSession:
         tools_description = "\n".join([tool.format_for_llm() for tool in all_tools])
         
         self.system_message = (
-            "You are a helpful assistant with access to these tools:\n\n"
+            "I am a helpful assistant with access to these tools:\n\n"
             f"{tools_description}\n"
             "Choose the appropriate tool based on the user's question. "
             "Before using a tool, reason once before using it.\n\n"
@@ -80,7 +80,8 @@ class ChatSession:
             "5. Avoid simply repeating the raw data\n\n"
             "Please use only the tools that are explicitly defined above."
 
-            "Once tool response is received, transform the raw data into a natural, conversational response."
+            "Once tool response is received, transform the raw data into a natural, conversational response. The response should be around 50-100 words.\n\n"
+            "If the tool call was related to MTA and the response is about subway stations and the tool response is correct, use origin, destination, travel time, departure time, and arrival time. Then elongate the response to be around 50-100 words.\n\n"
             "If the query is about MCP servers, check if the query mentions what type of MCP server is being asked for. "
         )
         
