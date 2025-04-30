@@ -7,6 +7,7 @@ __pycache__/
 .cache/
 .DS_Store
 XQ/
+modelcontextprotocol/
 
 # Jupyter
 .ipynb_checkpoints/
