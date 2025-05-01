@@ -39,7 +39,7 @@ export function AgentTweetCard({
         </div>
       </div>
       <button
-        onClick={() => window.open(socialUrl, "_blank")?.focus()}
+        onClick={() => { if (typeof window !== 'undefined') window.open(socialUrl, "_blank")?.focus(); }}
         className="absolute top-4 right-4 hover:opacity-80 transition-opacity"
       >
         <Icons.twitter className="h-4 w-4" aria-hidden="true" />

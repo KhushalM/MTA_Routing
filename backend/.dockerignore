@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.env
+.env.*
+.cache/
+.DS_Store
+XQ/
+modelcontextprotocol/
+.ipynb_checkpoints/
+Thumbs.db
+.git
+.gitignore
+README.md
+tests/

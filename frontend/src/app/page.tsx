@@ -7,9 +7,14 @@ import { AIInputWithLoading } from '@/components/ui/ai-input-with-loading';
 import { ResponseStream } from '@/components/ui/response-stream';
 import MCPServerList, { MCPServer } from '@/components/MCPServerList';
 import { AgentTweetCard } from '@/components/AgentTweetCard';
-import { MarkdownBlocks } from '@/components/MarkdownBlocks';
+import dynamic from 'next/dynamic';
 import { parseMarkdownToBlocks } from '@/utils/markdownToBlocks';
-import RouteMap from '@/components/RouteMap';
+
+const RouteMap = dynamic(() => import('@/components/RouteMap'), { ssr: false });
+const MarkdownBlocks = dynamic(
+  () => import('@/components/MarkdownBlocks').then(mod => mod.MarkdownBlocks),
+  { ssr: false }
+);
 
 interface Message {
   id: string;
@@ -190,13 +195,14 @@ export default function LandingPage() {
               );
             }
             // Always show AgentTweetCard for any AI string response
-            if (msg.sender === 'ai' && typeof msg.content === 'string') {
-              return (
-                <ChatBubble key={msg.id} sender={msg.sender}>
-                  <AgentTweetCard summary={msg.content} />
-                </ChatBubble>
-              );
-            }
+            // COMMENTED OUT to avoid double rendering and SSR issues
+            // if (msg.sender === 'ai' && typeof msg.content === 'string') {
+            //   return (
+            //     <ChatBubble key={msg.id} sender={msg.sender}>
+            //       <AgentTweetCard summary={msg.content} />
+            //     </ChatBubble>
+            //   );
+            // }
             // For the last assistant message, show streaming if loading
             if (msg.sender === 'ai' && idx === messages.length - 1 && streamedResponse && loading) {
               return (

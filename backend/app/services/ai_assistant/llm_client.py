@@ -4,6 +4,7 @@ Manages communication with local transformers with MPS acceleration.
 """
 
 import logging
+import os
 from typing import Dict, List
 from langchain.schema import SystemMessage, AIMessage, HumanMessage
 from langchain_community.llms import Ollama
@@ -23,8 +24,9 @@ class LLMClient:
             model: Model name to use in Ollama (default: gemma3:12b)
         """
         self.model_name: str = model
-        self.ollama = Ollama(model=model, temperature=0.7)
-        logger.info(f"Initialized Ollama LLM client with model: {model}")
+        self.ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+        self.ollama = Ollama(model=model, temperature=0.7, base_url=self.ollama_host)
+        logger.info(f"Initialized Ollama LLM client with model: {model} at host: {self.ollama_host}")
 
     async def get_response(
         self,

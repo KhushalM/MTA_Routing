@@ -15,21 +15,31 @@ from dotenv import load_dotenv
 import time
 from collections import defaultdict
 import sys
-from elasticsearch import Elasticsearch, helpers
+from elasticsearch import Elasticsearch, helpers, ConnectionError
 import google.transit.gtfs_realtime_pb2 as gtfs_realtime_pb2
 from fastmcp import FastMCP
 
 # Load environment variables
 load_dotenv()
 
-# Setup Elasticsearch
-es = Elasticsearch(
-    "http://localhost:9200",
-    headers={
-        "Accept": "application/vnd.elasticsearch+json;compatible-with=8",
-        "Content-Type": "application/vnd.elasticsearch+json;compatible-with=8"
-    }
-)
+# Wait for Elasticsearch to be available
+for i in range(20):
+    try:
+        es = Elasticsearch(
+            "http://elasticsearch:9200",
+            headers={
+                "Accept": "application/vnd.elasticsearch+json;compatible-with=8",
+                "Content-Type": "application/vnd.elasticsearch+json;compatible-with=8"
+            }
+        )
+        if es.ping():
+            print("Elasticsearch is up!")
+            break
+    except ConnectionError:
+        print("Waiting for Elasticsearch...")
+        time.sleep(3)
+else:
+    raise RuntimeError("Elasticsearch did not become available in time!")
 
 # Setup logging
 logging.basicConfig(

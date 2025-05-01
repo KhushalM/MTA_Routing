@@ -1,0 +1,22 @@
+# Ignore Python cache and environment
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.env
+.env.*
+.cache/
+.DS_Store
+XQ/
+modelcontextprotocol/
+.ipynb_checkpoints/
+Thumbs.db
+.git
+.gitignore
+README.md
+backend/tests/
+frontend/node_modules/
+frontend/.next/
+frontend/.env
+frontend/.env.*

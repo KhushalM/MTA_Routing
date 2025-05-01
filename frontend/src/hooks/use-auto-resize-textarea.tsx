@@ -48,6 +48,7 @@ export function useAutoResizeTextarea({
 
     // Adjust height on window resize
     useEffect(() => {
+        if (typeof window === "undefined") return;
         const handleResize = () => adjustHeight();
         window.addEventListener("resize", handleResize);
         return () => window.removeEventListener("resize", handleResize);

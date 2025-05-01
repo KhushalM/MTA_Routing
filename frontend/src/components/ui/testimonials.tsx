@@ -33,7 +33,7 @@ export function Testimonials({
   const [showAll, setShowAll] = useState(false)
 
   const openInNewTab = (url: string) => {
-    window.open(url, "_blank")?.focus()
+    if (typeof window !== 'undefined') window.open(url, "_blank")?.focus()
   }
 
   return (
