@@ -1,4 +1,4 @@
-# MTA MCP Server: Subway Routing with RAPTOR
+# MTA MCP Server: Subway Routing with RAPTOR 
 
 ## Overview
 This project provides an MCP (Modular Command Protocol) server for New York City subway routing using the RAPTOR algorithm via the [r5py](https://github.com/r5py/r5py) library. It exposes routing tools for integration with tool-using AI assistants and other systems.
