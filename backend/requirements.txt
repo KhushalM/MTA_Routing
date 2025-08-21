@@ -37,4 +37,7 @@ configargparse
 geohexgrid
 geopandas
 shapely
+fastmcp
+elasticsearch
+pytz
 

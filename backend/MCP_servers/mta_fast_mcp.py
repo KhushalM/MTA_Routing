@@ -21,13 +21,22 @@ import logging
 import sys
 from elasticsearch import Elasticsearch, helpers
 
-es = Elasticsearch(
-    "http://localhost:9200",
-    headers={
-        "Accept": "application/vnd.elasticsearch+json;compatible-with=8",
-        "Content-Type": "application/vnd.elasticsearch+json;compatible-with=8"
-    }
-)
+# Try to connect to Elasticsearch, but make it optional
+es = None
+try:
+    es = Elasticsearch(
+        "http://localhost:9200",
+        headers={
+            "Accept": "application/vnd.elasticsearch+json;compatible-with=8",
+            "Content-Type": "application/vnd.elasticsearch+json;compatible-with=8"
+        }
+    )
+    # Test the connection
+    es.info()
+    logger.info("Connected to Elasticsearch for POI lookup")
+except Exception as e:
+    logger.warning(f"Elasticsearch not available: {e}. POI lookup will use coordinates instead.")
+    es = None
 
 logging.basicConfig(
     level=logging.INFO,
@@ -55,23 +64,37 @@ def stops() -> pd.DataFrame:
 def get_nearest_poi(name: str):
     """
     Returns the (lat, lon) tuple of the nearest POI using Elasticsearch.
+    If Elasticsearch is not available, tries to parse as coordinates.
     """
-    res = es.search(
-        index="points_of_interest",
-        body={
-            "query": {
-                "match": {
-                    "name": name
+    if es is not None:
+        try:
+            res = es.search(
+                index="points_of_interest",
+                body={
+                    "query": {
+                        "match": {
+                            "name": name
+                        }
+                    }
                 }
-            }
-        }
-    )
-    hits = res["hits"]["hits"]
-    if hits:
-        loc = hits[0]["_source"]["location"]
-        return loc["lat"], loc["lon"]
-    else:
-        return None
+            )
+            hits = res["hits"]["hits"]
+            if hits:
+                loc = hits[0]["_source"]["location"]
+                return loc["lat"], loc["lon"]
+        except Exception as e:
+            logger.warning(f"Elasticsearch search failed: {e}")
+    
+    # Fallback: try to parse as coordinates "lat,lon" format
+    try:
+        parts = name.replace(" ", "").split(",")
+        if len(parts) == 2:
+            lat, lon = map(float, parts)
+            return lat, lon
+    except ValueError:
+        pass
+    
+    return None
 
 def get_transport_network():
     global _transport_network
@@ -107,6 +130,77 @@ def get_nearest_subway_station(lat: float, lon: float) -> Dict:
     stops_df["dist"] = stops_df.apply(lambda r: great_circle((lat, lon), (r.stop_lat, r.stop_lon)).meters, axis=1)
     n = stops_df.nsmallest(1, "dist").iloc[0]
     return {"station_id": n.stop_id, "stop_name": n.stop_name, "distance_m": round(n.dist, 1)}
+
+@mcp.tool()
+def plan_subway_trip_coordinates(origin_lat: float, origin_lon: float, destination_lat: float, destination_lon: float) -> Dict:
+    """Find optimal transit route between two coordinate points using r5py."""
+    logger.info(f"Origin: ({origin_lat}, {origin_lon}), Destination: ({destination_lat}, {destination_lon})")
+
+    origin = get_nearest_subway_station(origin_lat, origin_lon)
+    destination = get_nearest_subway_station(destination_lat, destination_lon)
+
+    try:
+        transport_network = get_transport_network()
+
+        # Build GeoDataFrames
+        origins = gpd.GeoDataFrame({
+            "id": ["origin"],
+            "geometry": [Point(origin_lon, origin_lat)]
+        }, geometry="geometry", crs="EPSG:4326")
+
+        destinations = gpd.GeoDataFrame({
+            "id": ["destination"],
+            "geometry": [Point(destination_lon, destination_lat)]
+        }, geometry="geometry", crs="EPSG:4326")
+
+        # Timezone-aware departure at current time NYC
+        ny_tz = pytz.timezone("America/New_York")
+        departure = datetime.datetime.now(ny_tz)
+
+        # Compute travel time matrix using supported r5py API
+        travel_time_matrix = r5py.TravelTimeMatrix(
+            transport_network,
+            origins=origins,
+            destinations=destinations,
+            departure=departure,
+            transport_modes=[r5py.TransportMode.TRANSIT, r5py.TransportMode.WALK],
+        )
+
+        if not travel_time_matrix.empty:
+            travel_time_minutes = travel_time_matrix.iloc[0]["travel_time"]
+            import math
+            rounded_minutes = math.ceil(travel_time_minutes)
+            arrival_time = departure + timedelta(minutes=rounded_minutes)
+
+            return {
+                "origin": origin["stop_name"],
+                "origin_lat": origin_lat,
+                "origin_lon": origin_lon,
+                "destination": destination["stop_name"],
+                "destination_lat": destination_lat,
+                "destination_lon": destination_lon,
+                "travel_time_minutes": round(travel_time_minutes, 1),
+                "departure_time": departure.strftime("%H:%M"),
+                "arrival_time": arrival_time.strftime("%H:%M"),
+            }
+        else:
+            return {
+                "origin": origin["stop_name"],
+                "origin_lat": origin_lat,
+                "origin_lon": origin_lon,
+                "destination": destination["stop_name"],
+                "destination_lat": destination_lat,
+                "destination_lon": destination_lon,
+                "message": "No route found between these locations."
+            }
+
+    except Exception as e:
+        return {
+            "origin": origin["stop_name"],
+            "destination": destination["stop_name"],
+            "error": str(e),
+            "message": "Error using r5py for routing."
+        }
 
 @mcp.tool()
 def plan_subway_trip(origin: str, destination: str) -> Dict:

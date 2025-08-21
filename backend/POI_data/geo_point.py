@@ -29,7 +29,10 @@ def parse_geom(geom_str):
     return {"lon": lon, "lat": lat}
 
 actions = []
-csv_path = "/Users/khushal/X_Query/backend/POI_data/Points_of_Interest_20250422.csv"  # Adjust path if needed
+# Get the directory of this script and find the CSV file relative to it
+import os
+script_dir = os.path.dirname(os.path.abspath(__file__))
+csv_path = os.path.join(script_dir, "Points_of_Interest_20250422.csv")
 with open(csv_path, newline='') as csvfile:
     reader = csv.DictReader(csvfile)
     for row in reader:
